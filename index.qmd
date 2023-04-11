@@ -27,20 +27,159 @@ Today, I learnt the following concepts in class:
 Provide more concrete details here. You can also use footenotes[^footnote] if you like
 
 ```{R results='hide'}
-#| output: false
-library(dplyr)
-library(purrr)
+library(dplyr) 
+library(purrr) 
+library(glmnet)
+library(torch)
+library(ISLR2)
+library(tidyr) 
+library(readr) 
+library(caret)
+library(mlbench)
+library(nnet)
+library(class)
+library(rpart)
+library(e1071) 
+library(luz) 
+library(torchvision)
 ```
 
 
-For example: 
-in class we learnt we learnt about the `map` function from the `purrr` package. 
 
+Using the breast cancer data set we looked at a neural network with 3 hidden layers. In order for it to work we needed to specify 4 parameters: p,q1,q2,q3.
 
-```{R results='hide', fig.width=7, fig.height=7}
-par(mfrow=c(3, 3), mar=c(3.5, 3.5, 2, 1), mgp=c(2.4, 0.8, 0))
-map(1:9, function(i)rnorm(1000) %>% hist(., main=i, col=i))
+Then we fit the neural net using Luz. It was like this:
+```{R
+fit_nn <- NNet %>%
+  
+  setup(
+    loss = nn_bce_loss(),
+    optimizer = optim_rmsprop(),
+    metrics = list(
+      luz_metric_accuracy()
+    )
+  )
+
+  set_hparams(p=...,q1=50,q2=30,q3=20) %>%
+  set_opt_hparams(lr=0.01)
+  
+  fit(
+    data = list(
+      df_train %>%
+       select(-y) %>%
+       as.matrix,
+      df_train %>%
+        select(y) %>%
+        as.matrix
+    ),
+    valid_data = list(
+      df_test %>%
+        select(-y) %>%
+        as.matrix,
+      df_test %>%
+        select(y) %>%
+        as.matrix,
+    ),
+    epochs = 50,
+    verbose = TRUE
+  )
 ```
+
+Luz expects the data to be input as a list. This is important for the `fit` part of the code above. In this list we need to specify our X and Y. We select every variable but the response in one list and then just the response variable in an other. Don't forget to use `as.matrix()`.
+
+Also its very useful because it doesn't matter what the data set looks like as long as the response variable is labeled `y` the code will work. Shown by the switch of the df from the breast cancer data set to the titanic data set.
+
+We can now make predictions on this model using the predict function.
+
+If a model has 0 intercept then when the intercept is 0 then everything else is also 0. This can be useful at times. For example if modeling horsepower to car price then it makes sense that if the horsepower is 0 then so should the price.
+
+In this case the neural net did worse than logistic regression but the good part is that we can change some parameters like the learning rate that will give us better results. Also these were small data sets but if we were to do this with bigger ones then the neural nets would outperform the logistic regression models in a more noticable way.
+
+#### Dataloaders
+
+```{R}
+dir <- "./mnist"
+
+mnist_dataset2 <- torch::dataset(
+  inherit = mnist_dataset,
+  .getitem = function(i) {
+    output <- super$.getitem(i)
+    output$y <- output$x
+    output
+  }
+)
+
+train_ds <- mnist_dataset2(
+  dir,
+  download = TRUE,
+  transform = transform
+)
+
+test_ds <- mnist_dataset2(
+  dir,
+  download = TRUE,
+  train = FALSE,
+  transform = transform
+)
+```
+
+```{R}
+typeof(train_ds)
+```
+This means that this automatically loads a bunch of different objects into our environment tab in Rstudio.
+
+```{R}
+length(train_ds)
+```
+So this means we have 60000 rows in our data set
+
+```{R}
+train_ds$data[42000, ,]
+```
+this is an image where the numbers are the intensity of the light of the pixels
+
+```{R}
+options(repr.plot.width=10,repr.plot.height=10)
+
+i <- sample(1:length(train_ds), 1)
+i <- 42000
+x <- train_ds$data[i, ,] %>% t
+
+image(x[1:28, 28:1], useRaster= TRUE, axes = FALSE, col = grey.colors(1000), main = train_ds$targets[i]-1)
+```
+
+
+_(the mnist data set is a part of torch so we dont really have to do the first part)_
+It allows us to make data objects that have dataLoaders
+ - Dataloaders are a key component in the machine learning pipeline
+ - They handle loading and preprocessing data in a efficient way for training and evaluating models
+ - They make it easy to work with large datasets by loading the data in smaller chunks, called batches and then applying transformation.
+ 
+  **Why use them?**
+ 
+ * Efficient memory management: loading data in smaller chunks which reduces memory usage.
+ * Parallelism: It supports asynchronous data loading for faster processing
+ * Preprocessing: apply data transformations on the fly during training and evaluation
+ * Flexibility: easily switch between different data sets or preprocessing steps
+ * Standardization: consistent data format across various machine learning projects.
+
+### Image classification
+The data set used above is scanned numbers and represented in 28x28 matrices where the value of each cell is the light value for each pixel. It also contains the right answer for what number the image represents.
+
+```{R}
+traind_dl <- dataloader(train_ds, batch_size = 128, shuffle = TRUE)
+test_dl <- dataloader(test_ds, batch_size = 128)
+```
+
+```{R}
+NNet_10 <- nn_module(
+  initialize = function(p,q1,q2,q3) {
+    self$hidden1 <- nn_linear
+  }
+)
+```
+
+
 
 
 
@@ -62,15 +201,6 @@ Today, I learnt the following concepts in class:
 
 Provide more concrete details here, e.g., 
 
-In class we learnt how to use the `map` function to create multiple regression diagnostic plots
-
-```{R results='hide', fig.height=4}
-par(mfcol=c(2, 3), mar=c(3.5, 3.5, 2, 1), mgp=c(2.4, 0.8, 0))
-mtcars %>%
-  split(.$cyl) %>%
-  map(~ lm(mpg ~ wt, data = .x)) %>%
-  map(function(x)plot(x, which=c(1, 2)))
-```
 
 
 [^footnote]: You can include some footnotes here

@@ -171,6 +171,8 @@ traind_dl <- dataloader(train_ds, batch_size = 128, shuffle = TRUE)
 test_dl <- dataloader(test_ds, batch_size = 128)
 ```
 
+
+_p has to be 28*28 because thats how big the matrices are and q3 has to be 10 because there are 10 classes (0,1,2,3,4,5,6,7,8,9)_
 ```{R}
 NNet_10 <- nn_module(
   initialize = function(p,q1,q2,q3) {

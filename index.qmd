@@ -167,21 +167,9 @@ It allows us to make data objects that have dataLoaders
 The data set used above is scanned numbers and represented in 28x28 matrices where the value of each cell is the light value for each pixel. It also contains the right answer for what number the image represents.
 
 ```{R}
-traind_dl <- dataloader(train_ds, batch_size = 128, shuffle = TRUE)
-test_dl <- dataloader(test_ds, batch_size = 128)
+train_dl <- dataloader(train_ds, batch_size = 2000, shuffle = TRUE)
+test_dl <- dataloader(test_ds, batch_size = 2000)
 ```
-
-
-_p has to be 28*28 because thats how big the matrices are and q3 has to be 10 because there are 10 classes (0,1,2,3,4,5,6,7,8,9)_
-```{R}
-NNet_10 <- nn_module(
-  initialize = function(p,q1,q2,q3) {
-    self$hidden1 <- nn_linear
-  }
-)
-```
-
-
 
 
 
@@ -196,12 +184,116 @@ Include a _very brief_ summary of what you learnt in this class here.
 
 Today, I learnt the following concepts in class:
 
-1. Item 1
-1. Item 2
-1. Item 3
+1. Image Classification
+1. Unsupervised learning
+1. 
 :::
 
-Provide more concrete details here, e.g., 
+
+_p has to be 28*28 because thats how big the matrices are and q3 has to be 10 because there are 10 classes (0,1,2,3,4,5,6,7,8,9)_
+```{R}
+NNet_10 <- nn_module(
+  initialize = function(p, q1, q2, q3, o) {
+    self$hidden1 <- nn_linear(p, q1)
+    self$hidden2 <- nn_linear(q1, q2)
+    self$hidden3 <- nn_linear(q2, q3)
+    self$OUTPUT <- nn_linear(q3, o)
+    self$activation <- nn_relu()
+  },
+  forward = function(x) {
+    x %>%
+      self$hidden1() %>%
+      self$activation() %>%
+      self$hidden2() %>%
+      self$activation() %>%
+      self$hidden3() %>%
+      self$activation() %>%
+      self$OUTPUT()
+  }
+)
+```
+
+_Now setting it up in Luz_
+```{R
+fit_nn <- NNet_10 %>%
+    #
+    # Setup the model
+    #
+    setup(
+        loss = nn_cross_entropy_loss(),
+        optimizer = optim_adam,
+        metrics = list(
+            luz_metric_accuracy()
+        )
+    ) %>%
+    #
+    # Set the hyperparameters
+    #
+    set_hparams(p=28*28, q1=256, q2=128, q3=64, o=10) %>% 
+    #
+    # Fit the model
+    #
+    fit(
+        epochs = 10,
+        data = train_dl,
+        # valid_data = test_dl,
+        verbose=TRUE
+    )
+```
+
+Because there are 60,000 observations and 2,000 batches there will be 30 steps.
+
+```{R
+NN10_preds <- fit_nn %>% 
+  predict(test_ds) %>% 
+  torch_argmax(dim = 2) %>%
+  as_array()
+```
+
+The model gives us a list of probabilities (in this case 10 items in the list since we have 10 classes) and we have to select the highest one. To do that we use the function `torch_argmex()`.
+
+We can then create a confusion matrix with all the predicted values for the numbers and their target values. By looking at this matrix we can tell that it confuses 4 for 9 and 8 for 3 which makes sense give the similarity of the symbols.
+
+### Supervised leaning
+For most of this course so far we have focused on supervised learning where we have access to labelled data (we are given access to the covariates and the responses). And using this data our goals were
+
+- using x to predict y
+- understand how each x influences the response y
+
+### Unsupervised learning 
+In unsupervised We don't have access to the labled data. our goal is to
+
+- understand the relationship between the Xs
+  - __dimension reduction__ is when we try to discover subgroups of variables that behave similarly 
+  -
+  
+#### Why unsupervised learning?
+Unsupervised learning is easier to obtain unlabeled data as opposed to labeled data. (also someone had to label all those numbers that we used for image classification)
+
+Unsupervised problems are more prevalent in nature so we encounter them more often in data science.
+
+### Principal Component Analysis (PCA)
+
+The objective of PCA is compressing all of the information of the data set into just 2 dimensions
+
+It does this by trying to create variables $(Z_1, Z_2, Z_q)$ for $q < p$ such that:
+
+1. $q << p$
+2.$(Z_1, Z_2, Z_q)$ contains roughly the same information as $(X_1, X_2, X_q)$
+
+__What does "the same amount of information mean??"__
+It means that it has the same amount of variance.
+
+__Step 1__
+The first principal component $Z_1$ is the normalized linear combination of the features:
+
+$Z_1 = v_11X_1 + v_21X_2 + \dots v_p1X_p$
+
+such that:
+ - $V_2$ and $V_1$ are orthogonal (the dot product of $V_2$ and $V_1$ is equal to 0)
+ - $Z_1$ has the largest possible variance
+ - the sum of $v^2_p  = 1$
+
 
 
 
